@@ -25,6 +25,8 @@ import logger from "@/utils/logger";
 
 import { toolsImplementations } from "../../trpc/tools.impl";
 import { configService } from "../config.service";
+import { buildM365BrokerErrorResult } from "../m365/broker-error-result";
+import { isM365BrokerError } from "../m365/errors";
 import { ConnectedClient } from "./client";
 import { getMcpServers } from "./fetch-metamcp";
 import { GATEWAY_CAPABILITIES } from "./gateway-capabilities";
@@ -752,7 +754,26 @@ export const createServer = async (
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    return await callToolWithMiddleware(request, handlerContext);
+    try {
+      return await callToolWithMiddleware(request, handlerContext);
+    } catch (error) {
+      // M365 delegated broker: a mint failure inside the injected
+      // fetch (no enrollment, expired grant, CA challenge, ...)
+      // surfaces here as a typed error. Answer with a structured
+      // isError tool result carrying the enrollment URL (+ best-effort
+      // SEP-1036 URL elicitation) instead of an opaque -32603 so the
+      // consumer can actually resolve it. See design doc §4.3.
+      //
+      // Deliberately tools/call-only: the m365 backends (softeria
+      // scaffold, then servers/m365) expose tools exclusively, and
+      // their list/discovery requests run unauthenticated by design —
+      // the other handlers can never hit a mint. Revisit if an
+      // injected server ever grows prompts/resources.
+      if (isM365BrokerError(error)) {
+        return buildM365BrokerErrorResult(error, server);
+      }
+      throw error;
+    }
   });
 
   // Get Prompt Handler
