@@ -212,6 +212,7 @@ app.get("/health/upstream", async (req, res) => {
 
     const servers = await mcpServersRepository.findAll();
     const pool = mcpServerPool.getPoolStatus();
+    const poolConfig = mcpServerPool.getPoolConfig();
     const perServer = pool.perServerCounts ?? {};
     const lastFailureAt = pool.lastConnectFailureAt ?? {};
     const lastSuccessAt = pool.lastConnectSuccessAt ?? {};
@@ -263,7 +264,20 @@ app.get("/health/upstream", async (req, res) => {
       pool: {
         idle: pool.idle,
         active: pool.active,
-        max_connections_per_server: pool.maxConnectionsPerServer,
+        pending: pool.pending ?? 0,
+        // pending-inclusive so `total` matches what canCreateConnection's
+        // MAX_TOTAL_CONNECTIONS check actually compares against
+        // (getTotalConnectionCount = idle+active+pending) — a total that
+        // silently dropped in-flight idle creations would read below the
+        // cap while the pool itself refuses new connections at it
+        // (2026-07-14 audit finding).
+        total: pool.idle + pool.active + (pool.pending ?? 0),
+        // Effective caps the pool actually enforces (from getPoolConfig, the
+        // single source of truth), NOT a re-parse of env with local defaults.
+        // The prior payload reported only the per-server cap and never the
+        // global cap, so an operator debugging saturation could not see it.
+        max_connections_per_server: poolConfig.maxConnectionsPerServer,
+        max_total_connections: poolConfig.maxTotalConnections,
       },
       servers: details,
     });

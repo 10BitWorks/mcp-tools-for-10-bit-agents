@@ -34,6 +34,12 @@ const TOOLS_SWEEP_MAX_PAGES = 50;
 export interface McpServerPoolStatus {
   idle: number;
   active: number;
+  // In-flight idle-session creations (this.creatingIdleSessions.size) — the
+  // SAME count getTotalConnectionCount() adds to idle+active for the
+  // MAX_TOTAL_CONNECTIONS cap check. Exposed so /health/upstream's `total`
+  // can match what the cap logic actually compares against, instead of
+  // silently undercounting by the in-flight set (2026-07-14 audit finding).
+  pending?: number;
   activeSessionIds: string[];
   idleServerUuids: string[];
   perServerCounts?: Record<string, number>;
@@ -810,6 +816,7 @@ export class McpServerPool {
     return {
       idle,
       active,
+      pending: this.creatingIdleSessions.size,
       activeSessionIds: Object.keys(this.activeSessions),
       idleServerUuids: Object.keys(this.idleSessions),
       perServerCounts,
@@ -817,6 +824,25 @@ export class McpServerPool {
       lastConnectFailureAt: { ...this.lastConnectFailureAt },
       lastConnectSuccessAt: { ...this.serverLastSuccessAt },
       pingFailures: { ...this.activePingFailures },
+    };
+  }
+
+  /**
+   * Read-only view of the pool's EFFECTIVE connection caps, for
+   * /health/upstream. Returns exactly what this running pool enforces —
+   * the single source of truth — so the health endpoint never re-parses env
+   * with its own (possibly divergent) defaults. Note: the singleton is
+   * constructed via getInstance(), which currently passes hardcoded caps and
+   * bypasses the constructor's env-parse; this getter faithfully reports the
+   * value in effect regardless of how it was set.
+   */
+  getPoolConfig(): {
+    maxConnectionsPerServer: number;
+    maxTotalConnections: number;
+  } {
+    return {
+      maxConnectionsPerServer: this.maxConnectionsPerServer,
+      maxTotalConnections: this.maxTotalConnections,
     };
   }
 
