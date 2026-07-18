@@ -132,6 +132,13 @@ RUN pnpm install --prod
 # Install drizzle-kit locally in backend for migrations
 RUN cd apps/backend && pnpm add drizzle-kit@0.31.1
 
+# Install CiviCRM MCP Server globally
+RUN npm install -g git+https://github.com/johncallhub/civicrm-mcp-server.git
+
+# Copy Portainer MCP Server from official image
+COPY --from=ghcr.io/jmrplens/portainer-mcp-enhanced:latest /usr/local/bin/portainer-mcp-enhanced /usr/local/bin/portainer-mcp
+
+
 # Copy startup script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
