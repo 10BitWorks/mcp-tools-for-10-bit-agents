@@ -93,8 +93,9 @@ LABEL org.opencontainers.image.vendor="metatool-ai"
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl postgresql-client && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install slack-mcp-server globally
-RUN npm install -g @korotovsky/slack-mcp-server
+# Install slack-mcp-server globally (Go binary)
+RUN curl -L -o /usr/local/bin/slack-mcp-server https://github.com/korotovsky/slack-mcp-server/releases/latest/download/slack-mcp-server-linux-amd64 && \
+    chmod +x /usr/local/bin/slack-mcp-server
 
 # Create non-root user with proper home directory
 RUN addgroup --system --gid 1001 nodejs
