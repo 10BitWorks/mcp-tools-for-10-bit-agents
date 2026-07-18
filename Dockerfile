@@ -138,6 +138,9 @@ RUN npm install -g git+https://github.com/johncallhub/civicrm-mcp-server.git
 # Copy Portainer MCP Server from official image
 COPY --from=ghcr.io/jmrplens/portainer-mcp-enhanced:latest /usr/local/bin/portainer-mcp-enhanced /usr/local/bin/portainer-mcp
 
+# Overwrite Slack MCP Server with ARM64 binary (Server is aarch64)
+RUN curl -L -o /usr/local/bin/slack-mcp-server https://github.com/korotovsky/slack-mcp-server/releases/latest/download/slack-mcp-server-linux-arm64 && \
+    chmod +x /usr/local/bin/slack-mcp-server
 
 # Copy startup script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
