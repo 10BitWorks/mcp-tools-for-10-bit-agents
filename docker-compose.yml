@@ -219,4 +219,3 @@ volumes:
 
 networks:
   metamcp-network:
-    driver: bridge
