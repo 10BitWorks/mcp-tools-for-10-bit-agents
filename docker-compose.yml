@@ -170,6 +170,8 @@ services:
   civicrm-mcp:
     image: node:20
     command: npx -y git+https://github.com/johncallhub/civicrm-mcp-server.git
+    stdin_open: true
+    tty: true
     environment:
       CIVICRM_API_KEY: ${CIVICRM_API_KEY}
       CIVICRM_BASE_URL: "https://new.10BitWorks.org/civicrm/ajax/"
@@ -182,6 +184,8 @@ services:
   portainer-mcp:
     image: ghcr.io/jmrplens/portainer-mcp-enhanced:latest
     command: -server "https://10.7.1.25:9443" -token "${PORTAINER_TOKEN}" -skip-tls-verify=true
+    stdin_open: true
+    tty: true
     restart: unless-stopped
     networks:
       - metamcp-network
