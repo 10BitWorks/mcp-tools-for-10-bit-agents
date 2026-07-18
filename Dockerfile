@@ -5,6 +5,7 @@ FROM ghcr.io/astral-sh/uv:debian AS base
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
+    git \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g pnpm@10.12.0 \
@@ -60,6 +61,24 @@ RUN set -e; \
     if [ "$count" -lt 2 ]; then echo "ERROR: expected >=2 next proxy-request.js files (dist + dist/esm), found $count" >&2; exit 1; fi; \
     printf '%s\n' "$files" | while read -r f; do sed -i -e "s/30000/600000/" "$f"; done
 
+# --- Build MCP Servers ---
+WORKDIR /mcp-servers
+
+# 1. Squarespace MCP
+RUN git clone https://github.com/BusyBee3333/squarespace-mcp-2026-complete.git squarespace-mcp \
+    && cd squarespace-mcp \
+    && npm install \
+    && npm run build
+
+# 2. Frigate MCP
+RUN git clone https://github.com/jakekeeys/frigate-mcp.git \
+    && cd frigate-mcp \
+    && uv venv .venv \
+    && VIRTUAL_ENV=/mcp-servers/frigate-mcp/.venv uv pip install -e .
+
+# Return to /app
+WORKDIR /app
+
 # Production runner stage
 FROM base AS runner
 WORKDIR /app
@@ -73,6 +92,9 @@ LABEL org.opencontainers.image.vendor="metatool-ai"
 
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl postgresql-client && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install slack-mcp-server globally
+RUN npm install -g @korotovsky/slack-mcp-server
 
 # Create non-root user with proper home directory
 RUN addgroup --system --gid 1001 nodejs
@@ -99,6 +121,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages ./packages
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./
+
+# Copy built MCP servers
+COPY --from=builder --chown=nextjs:nodejs /mcp-servers /mcp-servers
 
 # Install production dependencies only
 RUN pnpm install --prod
